@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal AI Chat</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gemini: {
+                            50: '#f0f4f9',
+                            100: '#e1e3e1',
+                            800: '#1e1f20',
+                            900: '#131314'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* Custom Styles & Overrides */
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Markdown formatting for AI responses */
+        .markdown-body {
+            font-size: 1rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .markdown-body p { margin-bottom: 1em; }
+        .markdown-body p:last-child { margin-
