@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Universal AI Chat</title>
-    
+    <title>Universal AI Chat Interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -13,30 +12,871 @@
                 extend: {
                     colors: {
                         gemini: {
-                            50: '#f0f4f9',
-                            100: '#e1e3e1',
-                            800: '#1e1f20',
-                            900: '#131314'
+                            bgLight: '#f0f4f9',
+                            bgDark: '#131314',
+                            sidebarLight: '#f0f4f9',
+                            sidebarDark: '#1e1f20',
+                            cardLight: '#ffffff',
+                            cardDark: '#1e1f20',
+                            accent: '#1a73e8'
                         }
                     }
                 }
             }
         }
     </script>
-
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Custom Styles & Overrides */
-        body {
-            -webkit-tap-highlight-color: transparent;
+        /* Custom scrollbar styles */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        .light ::webkit-scrollbar-thumb { background: #dfe1e5; border-radius: 10px; }
+        .dark ::webkit-scrollbar-thumb { background: #3c4043; border-radius: 10px; }
+        
+        /* Markdown overrides */
+        .prose pre {
+            background-color: #282c34;
+            color: #abb2bf;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+        .dark .prose pre { background-color: #0d0d0d; }
+        .prose code { font-family: monospace; font-size: 0.9em; }
+        .prose p { margin-bottom: 0.75rem; }
+        .prose ul, .prose ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .prose ul { list-style-type: disc; }
+        .prose ol { list-style-type: decimal; }
+        
+        /* Ensure layout stability */
+        html, body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
         }
         
-        /* Markdown formatting for AI responses */
-        .markdown-body {
-            font-size: 1rem;
-            line-height: 1.6;
-            word-wrap: break-word;
+        /* Loading Screen Fallback overlay */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #ffffff;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            transition: opacity 0.3s ease;
         }
-        .markdown-body p { margin-bottom: 1em; }
-        .markdown-body p:last-child { margin-
+        html.dark #loading { background: #131314; color: #ffffff; }
+    </style>
+</head>
+<body class="bg-white dark:bg-gemini-bgDark text-gray-900 dark:text-gray-100 min-h-screen flex flex-col antialiased transition-colors duration-200">
+
+    <div id="loading">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+        <p class="text-lg font-medium">Initializing Universal AI Chat...</p>
+    </div>
+
+    <div id="app-shell" class="flex flex-1 min-h-screen relative overflow-x-hidden">
+        
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden transition-opacity duration-200"></div>
+
+        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-gemini-sidebarLight dark:bg-gemini-sidebarDark border-r border-gray-200 dark:border-gray-800 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col h-full">
+            <div class="p-4 flex items-center justify-between">
+                <button id="new-chat-btn" class="flex items-center gap-3 px-4 py-3 bg-gray-200/60 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700/80 rounded-full text-sm font-medium transition w-full shadow-sm">
+                    <i class="fa-solid fa-plus text-gemini-accent text-lg"></i>
+                    <span>New chat</span>
+                </button>
+                <button id="close-sidebar-btn" class="md:hidden ml-2 p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full text-gray-500">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-3 py-2 space-y-1" id="chat-list-container">
+                </div>
+
+            <div class="p-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
+                <button id="theme-toggle-btn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-800 text-sm font-medium transition text-left">
+                    <i class="fa-solid fa-moon w-5 text-center text-gray-500 dark:hidden"></i>
+                    <i class="fa-solid fa-sun w-5 text-center text-amber-400 hidden dark:inline-block"></i>
+                    <span id="theme-text">Dark theme</span>
+                </button>
+                <button id="open-settings-btn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-800 text-sm font-medium transition text-left">
+                    <i class="fa-solid fa-gear w-5 text-center text-gray-500"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 min-h-screen relative bg-white dark:bg-gemini-bgDark">
+            
+            <header class="h-14 border-b border-gray-100 dark:border-gray-800/60 flex items-center justify-between px-4 z-20 sticky top-0 bg-white/80 dark:bg-gemini-bgDark/80 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <button id="hamburger-menu-btn" class="p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full md:hidden text-gray-600 dark:text-gray-300">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <span class="font-semibold text-lg tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent">Universal AI</span>
+                    <span id="header-model-badge" class="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full max-w-[120px] sm:max-w-none truncate"></span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button id="clear-current-chat-btn" class="p-2 text-gray-400 hover:text-red-500 rounded-full transition" title="Clear this chat window">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div id="conversation-viewport" class="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-6 pb-36">
+                <div id="welcome-pane" class="max-w-2xl mx-auto pt-12 text-center space-y-4">
+                    <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400">Hello, how can I help you today?</h1>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm max-w-md mx-auto">This Gemini-inspired clone links natively directly with OpenRouter's edge endpoints. Supply your API Key in Settings to stream models live.</p>
+                </div>
+                <div id="messages-output-target" class="max-w-3xl mx-auto space-y-6"></div>
+            </div>
+
+            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent dark:from-gemini-bgDark dark:via-gemini-bgDark px-4 pb-6 pt-10 z-10">
+                <div class="max-w-3xl mx-auto">
+                    <form id="chat-input-form" class="relative bg-gemini-bgLight dark:bg-gemini-sidebarDark rounded-3xl border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-700 shadow-sm px-4 py-3 flex items-end gap-2">
+                        <textarea id="chat-textarea" rows="1" placeholder="Message Universal AI..." class="w-full bg-transparent resize-none outline-none pr-12 text-base max-h-48 text-gray-800 dark:text-gray-100 py-1" style="height: 36px;"></textarea>
+                        <button type="submit" id="send-msg-btn" class="absolute right-3 bottom-2.5 p-2 bg-white dark:bg-gray-800 dark:text-white text-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-gray-800 transition shadow-sm" disabled>
+                            <i class="fa-solid fa-arrow-up"></i>
+                        </button>
+                    </form>
+                    <p class="text-center text-[11px] text-gray-400 dark:text-gray-500 mt-2">AI models can make errors. Verify important information.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="settings-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm animate-fade-in">
+        <div class="bg-white dark:bg-gemini-cardDark w-full max-w-md rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 transform scale-95 transition-transform duration-200" id="settings-card">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-500"></i> Configuration Engine</h3>
+                <button type="button" id="close-settings-modal-btn" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">OpenRouter Secret Key</label>
+                    <div class="relative">
+                        <input type="password" id="setting-api-key" placeholder="sk-or-v1-..." class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:border-blue-500 text-sm">
+                        <button type="button" id="toggle-password-visibility" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-eye text-xs"></i></button>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">Stored safely on your browser client localStorage engine.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Target Engine Endpoint Model</label>
+                    <input type="text" id="setting-model-name" placeholder="deepseek/deepseek-r1:free" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:border-blue-500 text-sm font-mono">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">System Architecture Prompt</label>
+                    <textarea id="setting-system-prompt" rows="3" placeholder="You are a helpful, expert AI assistant..." class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:border-blue-500 text-sm resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" id="save-settings-btn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-sm transition">Apply Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            "use strict";
+
+            // State Storage Context Blueprint Engine
+            const State = {
+                config: {
+                    apiKey: '',
+                    model: 'deepseek/deepseek-r1:free',
+                    globalSystemPrompt: 'You are a helpful, advanced AI assistant structured to provide concise, correct, and professional insights.'
+                },
+                ui: {
+                    darkMode: false,
+                    activeChatId: null
+                },
+                history: [] // Schema Array: { id, title, systemPrompt, messages: [ {role, content, timestamp} ] }
+            };
+
+            // Safe defensive Initialization DOM Elements References definitions Maps
+            const DOM = {
+                loader: document.getElementById('loading'),
+                sidebar: document.getElementById('sidebar'),
+                sidebarOverlay: document.getElementById('sidebar-overlay'),
+                hamburgerBtn: document.getElementById('hamburger-menu-btn'),
+                closeSidebarBtn: document.getElementById('close-sidebar-btn'),
+                newChatBtn: document.getElementById('new-chat-btn'),
+                chatListContainer: document.getElementById('chat-list-container'),
+                themeToggleBtn: document.getElementById('theme-toggle-btn'),
+                themeText: document.getElementById('theme-text'),
+                openSettingsBtn: document.getElementById('open-settings-btn'),
+                clearCurrentChatBtn: document.getElementById('clear-current-chat-btn'),
+                headerModelBadge: document.getElementById('header-model-badge'),
+                conversationViewport: document.getElementById('conversation-viewport'),
+                welcomePane: document.getElementById('welcome-pane'),
+                messagesOutputTarget: document.getElementById('messages-output-target'),
+                chatInputForm: document.getElementById('chat-input-form'),
+                chatTextarea: document.getElementById('chat-textarea'),
+                sendMsgBtn: document.getElementById('send-msg-btn'),
+                settingsModal: document.getElementById('settings-modal'),
+                closeSettingsModalBtn: document.getElementById('close-settings-modal-btn'),
+                saveSettingsBtn: document.getElementById('save-settings-btn'),
+                settingApiKey: document.getElementById('setting-api-key'),
+                settingModelName: document.getElementById('setting-model-name'),
+                settingSystemPrompt: document.getElementById('setting-system-prompt'),
+                togglePasswordVisibility: document.getElementById('toggle-password-visibility')
+            };
+
+            // Defensive state persistence initialization safe hooks
+            function loadStateFromStorage() {
+                try {
+                    const savedConfig = localStorage.getItem('ua_chat_config_v1');
+                    if (savedConfig) {
+                        const parsed = JSON.parse(savedConfig);
+                        State.config.apiKey = parsed.apiKey || '';
+                        State.config.model = parsed.model || 'deepseek/deepseek-r1:free';
+                        State.config.globalSystemPrompt = parsed.globalSystemPrompt || State.config.globalSystemPrompt;
+                    }
+
+                    const savedUi = localStorage.getItem('ua_chat_ui_v1');
+                    if (savedUi) {
+                        const parsed = JSON.parse(savedUi);
+                        State.ui.darkMode = !!parsed.darkMode;
+                        State.ui.activeChatId = parsed.activeChatId || null;
+                    }
+
+                    const savedHistory = localStorage.getItem('ua_chat_history_v1');
+                    if (savedHistory) {
+                        State.history = JSON.parse(savedHistory);
+                    }
+                } catch (e) {
+                    console.error("Critical State Error decoding LocalStorage configurations: ", e);
+                }
+            }
+
+            function saveStateToStorage() {
+                try {
+                    localStorage.setItem('ua_chat_config_v1', JSON.stringify(State.config));
+                    localStorage.setItem('ua_chat_ui_v1', JSON.stringify(State.ui));
+                    localStorage.setItem('ua_chat_history_v1', JSON.stringify(State.history));
+                } catch (e) {
+                    console.error("Critical State Storage failure saving persistence modules: ", e);
+                }
+            }
+
+            // Sync Environment Layout Renderings Lookups & Structural Themes state updates
+            function applyTheme() {
+                if (State.ui.darkMode) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                    if (DOM.themeText) DOM.themeText.innerText = "Light theme";
+                } else {
+                    document.documentElement.classList.add('light');
+                    document.documentElement.classList.remove('dark');
+                    if (DOM.themeText) DOM.themeText.innerText = "Dark theme";
+                }
+            }
+
+            function updateUIModelBadges() {
+                if (DOM.headerModelBadge) {
+                    DOM.headerModelBadge.innerText = State.config.model || 'No model chosen';
+                    DOM.headerModelBadge.title = State.config.model;
+                }
+            }
+
+            // Interactive Textarea Scaling
+            function autoScaleInputTextarea() {
+                if (!DOM.chatTextarea) return;
+                DOM.chatTextarea.style.height = '36px';
+                const computedHeight = DOM.chatTextarea.scrollHeight;
+                DOM.chatTextarea.style.height = Math.min(computedHeight, 192) + 'px';
+                
+                if (DOM.sendMsgBtn) {
+                    DOM.sendMsgBtn.disabled = !DOM.chatTextarea.value.trim();
+                }
+            }
+
+            // DOM Structural Chat Threads Mutation Engine
+            function createNewChatThread() {
+                const newId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const newThread = {
+                    id: newId,
+                    title: 'Untitled Chat Thread',
+                    systemPrompt: State.config.globalSystemPrompt,
+                    messages: []
+                };
+                State.history.unshift(newThread);
+                State.ui.activeChatId = newId;
+                saveStateToStorage();
+                renderChatHistoryList();
+                loadActiveChatThread();
+                closeSidebarMobile();
+            }
+
+            function selectChatThread(id) {
+                if (State.ui.activeChatId === id) {
+                    closeSidebarMobile();
+                    return;
+                }
+                State.ui.activeChatId = id;
+                saveStateToStorage();
+                renderChatHistoryList();
+                loadActiveChatThread();
+                closeSidebarMobile();
+            }
+
+            function deleteChatThread(id, event) {
+                if (event) event.stopPropagation();
+                if (!confirm("Are you certain you wish to purge this message history block?")) return;
+
+                State.history = State.history.filter(t => t.id !== id);
+                if (State.ui.activeChatId === id) {
+                    State.ui.activeChatId = State.history.length > 0 ? State.history[0].id : null;
+                }
+                saveStateToStorage();
+                renderChatHistoryList();
+                loadActiveChatThread();
+            }
+
+            function renameChatThread(id, event) {
+                if (event) event.stopPropagation();
+                const thread = State.history.find(t => t.id === id);
+                if (!thread) return;
+
+                const currentTitle = thread.title || 'Untitled Chat Thread';
+                const newTitle = prompt("Update Thread Label Designation Context:", currentTitle);
+                if (newTitle !== null && newTitle.trim() !== '') {
+                    thread.title = newTitle.trim();
+                    saveStateToStorage();
+                    renderChatHistoryList();
+                }
+            }
+
+            // Render Application Chat History Context Listing Elements
+            function renderChatHistoryList() {
+                if (!DOM.chatListContainer) return;
+                DOM.chatListContainer.innerHTML = '';
+
+                if (State.history.length === 0) {
+                    DOM.chatListContainer.innerHTML = `
+                        <div class="text-xs text-center text-gray-400 py-6 px-4">
+                            No active discussion histories logged. Click 'New chat' above to begin.
+                        </div>
+                    `;
+                    return;
+                }
+
+                State.history.forEach(thread => {
+                    const isActive = thread.id === State.ui.activeChatId;
+                    
+                    const itemNav = document.createElement('div');
+                    itemNav.className = `group relative flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 ${
+                        isActive 
+                        ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-800'
+                    }`;
+                    itemNav.addEventListener('click', () => selectChatThread(thread.id));
+
+                    // Title section
+                    const textFrame = document.createElement('div');
+                    textFrame.className = 'flex items-center gap-2.5 min-w-0 flex-1 pr-6';
+                    textFrame.innerHTML = `
+                        <i class="fa-regular fa-message text-sm text-gray-400 shrink-0 ${isActive ? 'text-blue-500 dark:text-blue-400' : ''}"></i>
+                        <span class="truncate pr-1 text-[13px] font-normal">${escapeHTML(thread.title || 'Untitled Thread')}</span>
+                    `;
+                    itemNav.appendChild(textFrame);
+
+                    // Operational context controls actions panel wrapper
+                    const ctrlBox = document.createElement('div');
+                    ctrlBox.className = `absolute right-2 top-2 hidden group-hover:flex items-center gap-1 ${isActive ? '!flex bg-transparent' : ''}`;
+                    
+                    // Rename Button
+                    const renBtn = document.createElement('button');
+                    renBtn.className = "p-1 hover:text-blue-500 text-gray-400 rounded transition";
+                    renBtn.innerHTML = '<i class="fa-solid fa-pen text-[11px]"></i>';
+                    renBtn.title = "Rename Thread";
+                    renBtn.addEventListener('click', (e) => renameChatThread(thread.id, e));
+                    
+                    // Delete Button
+                    const delBtn = document.createElement('button');
+                    delBtn.className = "p-1 hover:text-red-500 text-gray-400 rounded transition";
+                    delBtn.innerHTML = '<i class="fa-solid fa-trash text-[11px]"></i>';
+                    delBtn.title = "Delete Thread";
+                    delBtn.addEventListener('click', (e) => deleteChatThread(thread.id, e));
+
+                    ctrlBox.appendChild(renBtn);
+                    ctrlBox.appendChild(delBtn);
+                    itemNav.appendChild(ctrlBox);
+
+                    DOM.chatListContainer.appendChild(itemNav);
+                });
+            }
+
+            // Load and render active workspace conversation elements safely
+            function loadActiveChatThread() {
+                if (!DOM.messagesOutputTarget || !DOM.welcomePane) return;
+
+                DOM.messagesOutputTarget.innerHTML = '';
+                
+                const activeThread = State.history.find(t => t.id === State.ui.activeChatId);
+                if (!activeThread || activeThread.messages.length === 0) {
+                    DOM.welcomePane.classList.remove('hidden');
+                    return;
+                }
+
+                DOM.welcomePane.classList.add('hidden');
+                
+                activeThread.messages.forEach(msg => {
+                    appendMessageBubbleToDOM(msg.role, msg.content, false);
+                });
+
+                scrollToWorkspaceFloor();
+            }
+
+            // Append structured chat balloon nodes directly to active view ports
+            function appendMessageBubbleToDOM(role, initialContent, isStreaming = false) {
+                if (!DOM.messagesOutputTarget) return null;
+
+                const wrapperId = isStreaming ? 'streaming-bubble-node' : 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                
+                // Purge duplicate stream containers safely if requested
+                if (isStreaming && document.getElementById('streaming-bubble-node')) {
+                    document.getElementById('streaming-bubble-node').remove();
+                }
+
+                const blockContainer = document.createElement('div');
+                blockContainer.id = wrapperId;
+                blockContainer.className = `flex gap-4 w-full max-w-3xl mx-auto p-4 rounded-2xl transition-all ${
+                    role === 'user' 
+                    ? 'justify-end' 
+                    : 'justify-start'
+                }`;
+
+                const innerLayout = document.createElement('div');
+                innerLayout.className = `flex gap-3 max-w-[85%] ${role === 'user' ? 'flex-row-reverse' : 'flex-row'}`;
+
+                // Structural Icon Avatars Identification Matrix markers
+                const avatar = document.createElement('div');
+                avatar.className = `h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold shadow-sm ${
+                    role === 'user' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-emerald-600 text-white'
+                }`;
+                avatar.innerHTML = role === 'user' ? '<i class="fa-regular fa-user"></i>' : '<i class="fa-solid fa-microchip"></i>';
+
+                const contentsContainer = document.createElement('div');
+                contentsContainer.className = `flex flex-col space-y-1 ${role === 'user' ? 'items-end' : 'items-start'}`;
+
+                const originLabel = document.createElement('span');
+                originLabel.className = 'text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1';
+                originLabel.innerText = role === 'user' ? 'You' : 'Universal AI';
+
+                const displayBubble = document.createElement('div');
+                displayBubble.className = `px-4 py-2.5 rounded-2xl text-base shadow-sm prose max-w-none break-words ${
+                    role === 'user'
+                    ? 'bg-blue-500 text-white rounded-tr-none'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-tl-none'
+                }`;
+
+                // Target inner text assignment mapping structural safety conversions definitions
+                if (role === 'user') {
+                    displayBubble.innerText = initialContent;
+                } else {
+                    displayBubble.innerHTML = parseMarkdownSafely(initialContent);
+                }
+
+                // Append components structured layers
+                contentsContainer.appendChild(originLabel);
+                contentsContainer.appendChild(displayBubble);
+                innerLayout.appendChild(avatar);
+                innerLayout.appendChild(contentsContainer);
+                blockContainer.appendChild(innerLayout);
+                
+                DOM.messagesOutputTarget.appendChild(blockContainer);
+                return blockContainer;
+            }
+
+            // Safe parsing using CDN marked modules safely escaping exceptions definitions
+            function parseMarkdownSafely(rawMarkdown) {
+                if (!rawMarkdown) return '';
+                try {
+                    if (typeof marked !== 'undefined' && marked.parse) {
+                        return marked.parse(rawMarkdown);
+                    }
+                    return escapeHTML(rawMarkdown).replace(/\n/g, '<br>');
+                } catch (e) {
+                    console.error("Markdown parsing failed internally, defaulting safely: ", e);
+                    return escapeHTML(rawMarkdown);
+                }
+            }
+
+            function escapeHTML(str) {
+                return str.replace(/[&<>'"]/g, 
+                    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+                );
+            }
+
+            function scrollToWorkspaceFloor() {
+                if (DOM.conversationViewport) {
+                    DOM.conversationViewport.scrollTop = DOM.conversationViewport.scrollHeight;
+                }
+            }
+
+            // Primary System Form Network pipeline submit processing
+            async function handleUserChatMessageSubmit(event) {
+                if (event) event.preventDefault();
+                if (!DOM.chatTextarea || !DOM.sendMsgBtn) return;
+
+                const queryText = DOM.chatTextarea.value.trim();
+                if (!queryText) return;
+
+                // Enforce Key checkpoint warning if blank
+                if (!State.config.apiKey) {
+                    alert("Please provide an OpenRouter Key credentials set inside Settings configurations panel configuration prior to proceeding validation blocks.");
+                    openSettingsModal();
+                    return;
+                }
+
+                // If no active thread session configuration tracking window context available initialized, create one
+                if (!State.ui.activeChatId) {
+                    const newId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    const newThread = {
+                        id: newId,
+                        title: queryText.length > 24 ? queryText.substring(0, 24) + '...' : queryText,
+                        systemPrompt: State.config.globalSystemPrompt,
+                        messages: []
+                    };
+                    State.history.unshift(newThread);
+                    State.ui.activeChatId = newId;
+                }
+
+                const currentThread = State.history.find(t => t.id === State.ui.activeChatId);
+                if (!currentThread) return;
+
+                // Sync thread naming defaults lazily if fallback placeholders standard still stands active
+                if (currentThread.title === 'Untitled Chat Thread' && currentThread.messages.length === 0) {
+                    currentThread.title = queryText.length > 24 ? queryText.substring(0, 24) + '...' : queryText;
+                }
+
+                // Log customer entry points payloads context tracking maps updates
+                const userMsg = { role: 'user', content: queryText, timestamp: Date.now() };
+                currentThread.messages.push(userMsg);
+                
+                // Clear inputs buffers fields mappings sets reset layout viewports configurations
+                DOM.chatTextarea.value = '';
+                autoScaleInputTextarea();
+                DOM.welcomePane.classList.add('hidden');
+                
+                appendMessageBubbleToDOM('user', queryText, false);
+                renderChatHistoryList();
+                scrollToWorkspaceFloor();
+
+                // Initialize network payload structure
+                DOM.sendMsgBtn.disabled = true;
+                
+                // Construct message payloads payload stream packages arrays arrays structures definitions
+                const requestPayloadMessages = [];
+                if (currentThread.systemPrompt) {
+                    requestPayloadMessages.push({ role: 'system', content: currentThread.systemPrompt });
+                }
+                currentThread.messages.forEach(m => {
+                    requestPayloadMessages.push({ role: m.role, content: m.content });
+                });
+
+                // Spawn empty placeholders workspace elements tracking maps targets allocations sets initialization
+                const streamBubbleWrapper = appendMessageBubbleToDOM('assistant', 'Preparing live data response streaming channels...', true);
+                const streamDisplayTarget = streamBubbleWrapper ? streamBubbleWrapper.querySelector('.prose') : null;
+                scrollToWorkspaceFloor();
+
+                let completeCapturedAiResponseBuffer = '';
+
+                try {
+                    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+                    const headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${State.config.apiKey}`,
+                        "HTTP-Referer": window.location.href,
+                        "X-Title": "Universal AI Interface Clone"
+                    };
+                    const bodyObj = {
+                        model: State.config.model || "deepseek/deepseek-r1:free",
+                        messages: requestPayloadMessages,
+                        stream: true
+                    };
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(bodyObj)
+                    });
+
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`HTTP Endpoint Fault (${response.status}): ${errText || 'Unknown Connection exception.'}`);
+                    }
+
+                    const streamReader = response.body.getReader();
+                    const streamDecoder = new TextDecoder("utf-8");
+                    let residualBufferTokenChunk = '';
+
+                    while (true) {
+                        const { done, value } = await streamReader.read();
+                        if (done) break;
+
+                        residualBufferTokenChunk += streamDecoder.decode(value, { stream: true });
+                        const signalLines = residualBufferTokenChunk.split("\n");
+                        
+                        // Buffer remainder back safely
+                        residualBufferTokenChunk = signalLines.pop() || '';
+
+                        for (const rawLine of signalLines) {
+                            const stylizedLine = rawLine.trim();
+                            if (!stylizedLine) continue;
+                            if (stylizedLine === "data: [DONE]") break;
+
+                            if (stylizedLine.startsWith("data: ")) {
+                                const parsedJsonContentStr = stylizedLine.substring(6);
+                                try {
+                                    const parsedChunk = JSON.parse(parsedJsonContentStr);
+                                    const tokenContent = parsedChunk.choices?.[0]?.delta?.content || '';
+                                    if (tokenContent) {
+                                        if (completeCapturedAiResponseBuffer === '') {
+                                            if (streamDisplayTarget) streamDisplayTarget.innerHTML = '';
+                                        }
+                                        completeCapturedAiResponseBuffer += tokenContent;
+                                        if (streamDisplayTarget) {
+                                            streamDisplayTarget.innerHTML = parseMarkdownSafely(completeCapturedAiResponseBuffer);
+                                        }
+                                        scrollToWorkspaceFloor();
+                                    }
+                                } catch (err) {
+                                    // Soft ignore anomalies chunk lines variants fragments components
+                                }
+                            }
+                        }
+                    }
+
+                    // Flush fallback remnants anomalies
+                    if (residualBufferTokenChunk.startsWith("data: ")) {
+                         try {
+                            const parsedChunk = JSON.parse(residualBufferTokenChunk.substring(6));
+                            const tokenContent = parsedChunk.choices?.[0]?.delta?.content || '';
+                            if (tokenContent) {
+                                completeCapturedAiResponseBuffer += tokenContent;
+                            }
+                         } catch(e){}
+                    }
+
+                    // Fallback baseline handling if token buffers returned empty matrix mappings sets configs
+                    if (!completeCapturedAiResponseBuffer) {
+                        completeCapturedAiResponseBuffer = "No substantive data responses token stream streams elements fetched. Confirm API Key validity limits parameters permissions setups.";
+                    }
+
+                    // Commit final stable compiled system structures payloads trace logs elements updates
+                    if (streamDisplayTarget) {
+                        streamDisplayTarget.innerHTML = parseMarkdownSafely(completeCapturedAiResponseBuffer);
+                    }
+
+                    // Convert live temporary streaming nodes structures block wrappers maps into structural session trace lists tracking blocks states definitions
+                    if (streamBubbleWrapper) {
+                        streamBubbleWrapper.id = 'msg_' + Date.now();
+                    }
+
+                    currentThread.messages.push({
+                        role: 'assistant',
+                        content: completeCapturedAiResponseBuffer,
+                        timestamp: Date.now()
+                    });
+
+                    saveStateToStorage();
+
+                } catch (netErr) {
+                    console.error("Critical Connection Exception pipeline: ", netErr);
+                    if (streamDisplayTarget) {
+                        streamDisplayTarget.innerHTML = `<span class="text-red-500 font-medium flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Runtime Exception: ${escapeHTML(netErr.message)}</span>`;
+                    }
+                    
+                    currentThread.messages.push({
+                        role: 'assistant',
+                        content: `System Failure Exception Pipeline details error output logs parameter instances maps: ${netErr.message}`,
+                        timestamp: Date.now()
+                    });
+                    saveStateToStorage();
+                } finally {
+                    DOM.sendMsgBtn.disabled = false;
+                    autoScaleInputTextarea();
+                }
+            }
+
+            // Interactive Modals Panels view actions controllers overrides
+            function openSettingsModal() {
+                if (!DOM.settingsModal || !DOM.settingApiKey || !DOM.settingModelName || !DOM.settingSystemPrompt) return;
+                
+                DOM.settingApiKey.value = State.config.apiKey || '';
+                DOM.settingModelName.value = State.config.model || 'deepseek/deepseek-r1:free';
+                DOM.settingSystemPrompt.value = State.config.globalSystemPrompt || '';
+
+                DOM.settingsModal.classList.remove('hidden');
+            }
+
+            function closeSettingsModal() {
+                if (DOM.settingsModal) DOM.settingsModal.classList.add('hidden');
+            }
+
+            function applySettingsConfigurationsChanges() {
+                if (!DOM.settingApiKey || !DOM.settingModelName || !DOM.settingSystemPrompt) return;
+
+                State.config.apiKey = DOM.settingApiKey.value.trim();
+                State.config.model = DOM.settingModelName.value.trim() || 'deepseek/deepseek-r1:free';
+                State.config.globalSystemPrompt = DOM.settingSystemPrompt.value.trim();
+
+                // Cascades adjustments to active structural thread contexts frameworks dynamically parameters checks updates
+                if (State.ui.activeChatId) {
+                    const activeThread = State.history.find(t => t.id === State.ui.activeChatId);
+                    if (activeThread && activeThread.messages.length === 0) {
+                        activeThread.systemPrompt = State.config.globalSystemPrompt;
+                    }
+                }
+
+                saveStateToStorage();
+                updateUIModelBadges();
+                closeSettingsModal();
+            }
+
+            // Workspace Management Actions
+            function purgeActiveWorkspaceChatPane() {
+                if (!State.ui.activeChatId) return;
+                if (!confirm("Are you sure you want to clear all messages from this conversation?")) return;
+
+                const activeThread = State.history.find(t => t.id === State.ui.activeChatId);
+                if (activeThread) {
+                    activeThread.messages = [];
+                    saveStateToStorage();
+                    loadActiveChatThread();
+                }
+            }
+
+            // Mobile Navigation Framework Toggle Drawer Mechanics Actions Utility functions
+            function openSidebarMobile() {
+                if (DOM.sidebar && DOM.sidebarOverlay) {
+                    DOM.sidebar.classList.remove('-translate-x-full');
+                    DOM.sidebarOverlay.classList.remove('hidden');
+                }
+            }
+
+            function closeSidebarMobile() {
+                if (DOM.sidebar && DOM.sidebarOverlay) {
+                    DOM.sidebar.classList.add('-translate-x-full');
+                    DOM.sidebarOverlay.classList.add('hidden');
+                }
+            }
+
+            // Central Event Wireup Engine Mapping Allocator initialization
+            function bindLifecycleEventHandlersListeners() {
+                // Hamburgers menu open actions toggle allocations wireups
+                if (DOM.hamburgerBtn) DOM.hamburgerBtn.addEventListener('click', openSidebarMobile);
+                if (DOM.closeSidebarBtn) DOM.closeSidebarBtn.addEventListener('click', closeSidebarMobile);
+                if (DOM.sidebarOverlay) DOM.sidebarOverlay.addEventListener('click', closeSidebarMobile);
+
+                // Modals elements buttons controls configurations wireups mappings actions
+                if (DOM.openSettingsBtn) DOM.openSettingsBtn.addEventListener('click', openSettingsModal);
+                if (DOM.closeSettingsModalBtn) DOM.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+                if (DOM.saveSettingsBtn) DOM.saveSettingsBtn.addEventListener('click', applySettingsConfigurationsChanges);
+                
+                // Password visibility toggle actions
+                if (DOM.togglePasswordVisibility && DOM.settingApiKey) {
+                    DOM.togglePasswordVisibility.addEventListener('click', () => {
+                        const currentType = DOM.settingApiKey.type;
+                        DOM.settingApiKey.type = currentType === 'password' ? 'text' : 'password';
+                        const eyeIcon = DOM.togglePasswordVisibility.querySelector('i');
+                        if (eyeIcon) {
+                            eyeIcon.classList.toggle('fa-eye');
+                            eyeIcon.classList.toggle('fa-eye-slash');
+                        }
+                    });
+                }
+
+                // Workspace Chat Thread creation control links allocations sets handlers configurations
+                if (DOM.newChatBtn) DOM.newChatBtn.addEventListener('click', createNewChatThread);
+                if (DOM.clearCurrentChatBtn) DOM.clearCurrentChatBtn.addEventListener('click', purgeActiveWorkspaceChatPane);
+
+                // Global configurations toggle dark light skin styles adjustments mappings sets logic actions handles
+                if (DOM.themeToggleBtn) {
+                    DOM.themeToggleBtn.addEventListener('click', () => {
+                        State.ui.darkMode = !State.ui.darkMode;
+                        saveStateToStorage();
+                        applyTheme();
+                    });
+                }
+
+                // Auto-scaling textarea logic loops binds sets allocation targets mapping parameters overrides
+                if (DOM.chatTextarea) {
+                    DOM.chatTextarea.addEventListener('input', autoScaleInputTextarea);
+                    DOM.chatTextarea.addEventListener('keydown', (e) => {
+                        // Support Command/Ctrl + Enter execution patterns, standard Enter handles return feed line breaks on mobile elements cleanly
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            if (window.innerWidth > 768) { 
+                                e.preventDefault();
+                                handleUserChatMessageSubmit();
+                            }
+                        }
+                    });
+                }
+
+                if (DOM.chatInputForm) {
+                    DOM.chatInputForm.addEventListener('submit', handleUserChatMessageSubmit);
+                }
+
+                // Structural global listeners catching window click dismiss actions mapping routines configuration parameters controls overlays sets
+                window.addEventListener('click', (e) => {
+                    if (e.target === DOM.settingsModal) {
+                        closeSettingsModal();
+                    }
+                });
+            }
+
+            // Core Application Bootsystem entry hook sequence initialization parameters configurations sets block execution pipelines
+            function initializeUniversalChatApplicationCore() {
+                try {
+                    loadStateFromStorage();
+                    applyTheme();
+                    updateUIModelBadges();
+                    bindLifecycleEventHandlersListeners();
+                    
+                    // Fallback default state initialization pipeline structure checks mappings
+                    if (State.history.length > 0 && !State.ui.activeChatId) {
+                        State.ui.activeChatId = State.history[0].id;
+                    }
+                    
+                    renderChatHistoryList();
+                    loadActiveChatThread();
+                    autoScaleInputTextarea();
+                    
+                } catch (bootstrapException) {
+                    console.error("Fatal System Exception occurred while launching Application Shell: ", bootstrapException);
+                } finally {
+                    // Safe execution release: dismiss background fallback layer safely preventing GitHub pages layout blackouts instances maps setup
+                    if (DOM.loader) {
+                        DOM.loader.style.opacity = '0';
+                        setTimeout(() => {
+                            DOM.loader.remove();
+                        }, 300);
+                    }
+                }
+            }
+
+            // Trigger safe execution block
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeUniversalChatApplicationCore);
+            } else {
+                initializeUniversalChatApplicationCore();
+            }
+
+        })();
+    </script>
+</body>
+</html>
